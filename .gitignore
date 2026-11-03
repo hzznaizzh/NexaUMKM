@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local configuration
+config.local.php
+
+# Logs and temporary files
+*.log
+.DS_Store
+Thumbs.db
+
+# Local test
+test_db.php
+
+env
+stress-test-result.json
+backend/test.php
+test_db.php
+# Exclude dataset and documentation until permission is confirmed
+html/data_asli.csv
+html/Panduan_Pengisian_SiSEHAT.pdf
