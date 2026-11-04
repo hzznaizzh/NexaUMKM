@@ -1,25 +1,25 @@
 /* ===== CSS VARIABLES ===== */
 :root {
-  --primary: #1a56db;
-  --primary-light: #e8f0fe;
-  --primary-dark: #1341b0;
-  --primary-deep: #1e3a8a;
-  --success: #0f9b6e;
-  --success-light: #d1fae5;
+  --primary: #263d50;
+  --primary-light: #eaf0f2;
+  --primary-dark: #1c3040;
+  --primary-deep: #54758a;
+  --success: #567b6f;
+  --success-light: #e5eee9;
   --danger: #e53e3e;
   --danger-light: #fff5f5;
-  --warning: #f6ad55;
-  --warning-light: #fffbeb;
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
+  --warning: #b88a42;
+  --warning-light: #f7f0e2;
+  --gray-50: #faf9f6;
+  --gray-100: #f4f2ec;
+  --gray-200: #e5e6e3;
+  --gray-300: #d3d9d8;
+  --gray-400: #9aa8ad;
+  --gray-500: #71818d;
+  --gray-600: #566875;
+  --gray-700: #405462;
+  --gray-800: #34495a;
+  --gray-900: #263d50;
   --sidebar-w: 220px;
   --topbar-h: 56px;
   --radius: 12px;
@@ -734,6 +734,77 @@ body {
 .help-bottom-text h3 { font-size: 24px; font-weight: 800; color: #111827; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
 .help-bottom-text p { font-size: 15px; color: #4b5563; line-height: 1.6; }
 .help-bottom-image { width: 100%; height: 260px; background: #fff; border: 12px solid #fff; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); overflow: hidden; position: relative;}
+
+.landing-nav,
+.chart-card,
+.card,
+.factor-card,
+.spider-card,
+.stat-card,
+.performer-card,
+.gap-card,
+.notif-ai-card {
+  border-color: var(--gray-200);
+  box-shadow: 0 8px 26px rgba(38, 61, 80, 0.045);
+}
+
+.nav-item.active,
+.btn-primary {
+  background-color: var(--primary);
+}
+
+.nav-item.active {
+  border-radius: 0 10px 10px 0;
+}
+
+.btn-primary {
+  border-color: var(--primary);
+}
+
+.nav-item:hover,
+.dropdown-item:hover {
+  color: var(--primary);
+}
+
+.page-header h1,
+.chart-title,
+.stat-value,
+.factor-name,
+.performer-id,
+.gap-title {
+  color: var(--primary);
+}
+
+.page-footer {
+  color: var(--gray-500);
+}
+
+@media (max-width: 640px) {
+  #topbar {
+    padding: 0 12px;
+  }
+
+  .search-wrap {
+    width: min(42vw, 190px);
+  }
+
+  .welcome-bar,
+  .page-header-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .notif-footer-grid,
+  .help-bottom-grid,
+  .exec-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .factor-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 .notif-header {
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;

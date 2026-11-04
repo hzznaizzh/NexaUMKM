@@ -351,7 +351,7 @@ async function saveEvaluasi() {
     }
 
     // Refresh semua chart & data dengan total terbaru
-    if (typeof refreshAllCharts === 'function') refreshAllCharts();
+    if (typeof refreshAllCharts === 'function') await refreshAllCharts();
 
     showFeedbackPopup(res.data, elapsed);
     _formStartTime = null;
@@ -400,7 +400,7 @@ function showFeedbackPopup(data, elapsed) {
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
         <h2 style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">Kuesioner Berhasil Disimpan!</h2>
-        <p style="font-size:13px;color:var(--gray-500)">Data telah tersimpan ke database NexaUMKM</p>
+        <p style="font-size:13px;color:var(--gray-500)">Data telah tersimpan ke database UMGORIA</p>
       </div>
 
       <!-- Stats row -->

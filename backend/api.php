@@ -1,9 +1,9 @@
 <?php
 /**
- * NexaUMKM — REST API (single-file router)
+ * UMGORIA — REST API (single-file router)
  *
  * Letakkan file ini di root backend, contoh:
- *   /htdocs/nexaumkm/backend/api.php
+ *   /htdocs/UMGORIA/backend/api.php
  *
  * Endpoint yang tersedia:
  *   POST   /api.php?action=register          — daftar akun baru

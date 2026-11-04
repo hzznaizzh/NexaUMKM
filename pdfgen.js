@@ -43,7 +43,7 @@ doc.text('3. Pastikan Anda memilih Peran (Owner/Pegawai) yang sesuai sebelum men
 doc.text('4. Jawab seluruh kuesioner yang muncul dan tekan Simpan.');
 
 doc.moveDown(3);
-doc.fontSize(10).fillColor('#9ca3af').text('Panduan ini di-generate otomatis oleh NexaUMKM System pada: ' + new Date().toISOString().split('T')[0], { align: 'center' });
+doc.fontSize(10).fillColor('#9ca3af').text('Panduan ini di-generate otomatis oleh UMGORIA pada: ' + new Date().toISOString().split('T')[0], { align: 'center' });
 
 doc.end();
 console.log("PDF Created.");

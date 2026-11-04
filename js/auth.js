@@ -68,7 +68,7 @@ function renderLoginForm() {
   return `
     <div class="auth-form-wrap">
       <h1 class="auth-title">Selamat Datang Kembali</h1>
-      <p class="auth-subtitle">Akses dasbor dan laporan klinis Anda.</p>
+      <p class="auth-subtitle">Akses dasbor dan ringkasan hasil asesmen organisasi Anda.</p>
       ${roleCardsHTML()}
       <div class="form-group">
         <label class="field-label">Email Bisnis</label>
@@ -113,7 +113,7 @@ function renderRegisterForm() {
         <label class="field-label">Email Bisnis</label>
         <div class="field-wrap">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          <input type="email" id="regEmail" placeholder="admin@nexaumkm.com" value="${_regTemp.email||''}">
+          <input type="email" id="regEmail" placeholder="admin@umgoria.id" value="${_regTemp.email||''}">
         </div>
       </div>
       <div class="form-group-half">
@@ -134,7 +134,7 @@ function renderRegisterForm() {
       </div>
       <div class="checkbox-wrap">
         <input type="checkbox" id="regAgree">
-        <label class="checkbox-label" for="regAgree">Saya menyetujui <a>Syarat &amp; Ketentuan</a> serta <a>Kebijakan Privasi</a> NexaUMKM.</label>
+        <label class="checkbox-label" for="regAgree">Saya menyetujui <a>Syarat &amp; Ketentuan</a> serta <a>Kebijakan Privasi</a> UMGORIA.</label>
       </div>
       <button class="btn-auth" id="btnReg1" onclick="handleRegisterStep1()">Lanjut →</button>
       <p class="auth-link-text">Sudah memiliki akun? <a onclick="showView('login')">Masuk di sini</a></p>

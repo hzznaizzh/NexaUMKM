@@ -1,8 +1,8 @@
-# ARCHITECTURE.md — NexaUMKM
+# ARCHITECTURE.md — UMGORIA
 
 ## Gambaran Umum
 
-**NexaUMKM** adalah platform analitik kesehatan organisasi untuk UMKM berbasis web. Aplikasi ini memungkinkan pemilik UMKM dan pegawainya mengisi formulir penilaian **6 faktor kesehatan organisasi** (OH-Index), lalu menampilkan skor, dashboard, dan perbandingan antar UMKM secara real-time.
+**UMGORIA (UMKM Growth Journey)** adalah platform analitik kesehatan organisasi untuk UMKM berbasis web. Aplikasi ini memungkinkan pemilik UMKM dan pegawainya mengisi formulir penilaian **6 faktor kesehatan organisasi**, lalu menampilkan skor dan dashboard berdasarkan hasil asesmen yang tersimpan.
 
 Platform ini di-hosting di **InfinityFree** dengan arsitektur monolitik sederhana: satu halaman PHP sebagai frontend SPA, dan satu file PHP sebagai REST API backend.
 
@@ -11,7 +11,7 @@ Platform ini di-hosting di **InfinityFree** dengan arsitektur monolitik sederhan
 ## Struktur Direktori
 
 ```
-nexaumkm/
+umgoria/
 ├── index.php               # Frontend — Single Page Application (SPA)
 ├── .htaccess               # Routing frontend + konfigurasi PHP
 │

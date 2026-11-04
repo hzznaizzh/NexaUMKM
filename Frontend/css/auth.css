@@ -234,3 +234,46 @@
   .hero-desc { font-size: 14px; }
   .hero-stats { gap: 20px; }
 }
+
+.auth-left {
+  background: linear-gradient(155deg, #263d50 0%, #54758a 100%);
+}
+
+.auth-title,
+.role-card-title {
+  color: #263d50;
+}
+
+.role-card:hover,
+.role-card.selected {
+  border-color: #54758a;
+  background: #eaf0f2;
+}
+
+.role-card.selected .role-card-icon {
+  background: #263d50;
+}
+
+.field-wrap:focus-within,
+.field-number-wrap:focus-within {
+  border-color: #54758a;
+  box-shadow: 0 0 0 3px #eaf0f2;
+}
+
+.checkbox-wrap input[type="checkbox"] {
+  accent-color: #263d50;
+}
+
+.checkbox-label a,
+.auth-link-text a {
+  color: #54758a;
+}
+
+.btn-auth {
+  background: #263d50;
+}
+
+.btn-auth:hover {
+  background: #54758a;
+  box-shadow: 0 4px 12px rgba(38, 61, 80, 0.2);
+}

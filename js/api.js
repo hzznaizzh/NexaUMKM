@@ -1,5 +1,5 @@
 /**
- * NexaUMKM — Frontend API Client
+ * UMGORIA — Frontend API Client
  * File ini WAJIB ada. Berisi semua komunikasi ke backend PHP.
  */
 
@@ -8,12 +8,36 @@ const API_BASE = '../backend/api.php';
 
 // ── Token & user storage ──────────────────────────────────────
 const TokenStore = {
-  get()       { return localStorage.getItem('nexa_token'); },
-  set(t)      { localStorage.setItem('nexa_token', t); },
-  clear()     { localStorage.removeItem('nexa_token'); },
-  getUser()   { try { return JSON.parse(localStorage.getItem('nexa_user') || 'null'); } catch { return null; } },
-  setUser(u)  { localStorage.setItem('nexa_user', JSON.stringify(u)); },
-  clearUser() { localStorage.removeItem('nexa_user'); },
+  get() {
+    const token = localStorage.getItem('umgoria_token') || localStorage.getItem('nexa_token');
+    if (token) localStorage.setItem('umgoria_token', token);
+    return token;
+  },
+  set(t) {
+    localStorage.setItem('umgoria_token', t);
+    localStorage.removeItem('nexa_token');
+  },
+  clear() {
+    localStorage.removeItem('umgoria_token');
+    localStorage.removeItem('nexa_token');
+  },
+  getUser() {
+    try {
+      const user = localStorage.getItem('umgoria_user') || localStorage.getItem('nexa_user');
+      if (user) localStorage.setItem('umgoria_user', user);
+      return JSON.parse(user || 'null');
+    } catch {
+      return null;
+    }
+  },
+  setUser(u) {
+    localStorage.setItem('umgoria_user', JSON.stringify(u));
+    localStorage.removeItem('nexa_user');
+  },
+  clearUser() {
+    localStorage.removeItem('umgoria_user');
+    localStorage.removeItem('nexa_user');
+  },
 };
 
 // ── Base HTTP wrapper ─────────────────────────────────────────

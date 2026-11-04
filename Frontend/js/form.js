@@ -11,6 +11,15 @@ const OWNER_QUESTIONS = {
       {id:'ins_oh5',text:'Apakah Anda menggunakan pemasaran digital untuk mempromosikan bisnis?',options:['1 = Tidak','2 = Dalam Proses','3 = Ya']},
       {id:'ins_oh6',text:'Apa sumber modal keuangan utama bisnis Anda?',options:['1 = Modal Sendiri','2 = Keluarga','3 = Bank/Kredit']},
     ]},
+  ECT:{ key:'ECT',label:'Eksternal (ECT) — Economic Connectivity',color:'#0891b2',bgColor:'#e0f2fe',
+    icon:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
+    description:'Kinerja ekonomi dan konektivitas bisnis dengan pasar eksternal.',type:'likert5',maxVal:5,
+    questions:[
+      {id:'ect_oh32',text:'Kemampuan bisnis kami menjangkau pasar atau pelanggan baru sangat baik'},
+      {id:'ect_oh33',text:'Pertumbuhan penjualan bisnis kami selama setahun terakhir sangat memuaskan'},
+      {id:'ect_oh34',text:'Liabilitas bisnis kami (pinjaman, utang) sangat dapat dikelola'},
+      {id:'ect_oh35',text:'Situasi arus kas bisnis kami sangat sehat dan stabil'},
+    ]},
   OPS:{ key:'OPS',label:'Inovasi (OPS) — Operational Stability',color:'#d97706',bgColor:'#fef3c7',
     icon:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
     description:'Stabilitas operasional dan kemampuan bisnis mengelola proses sehari-hari.',type:'likert5',maxVal:5,
@@ -21,15 +30,6 @@ const OWNER_QUESTIONS = {
       {id:'ops_oh29',text:'Rantai pasokan bisnis berjalan lancar tanpa gangguan signifikan'},
       {id:'ops_oh30',text:'Permintaan produk/jasa dapat diprediksi dengan baik'},
       {id:'ops_oh31',text:'Kualitas hubungan jangka panjang bisnis dengan pelanggan sangat baik'},
-    ]},
-  ECT:{ key:'ECT',label:'Eksternal (ECT) — Economic Connectivity',color:'#0891b2',bgColor:'#e0f2fe',
-    icon:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
-    description:'Kinerja ekonomi dan konektivitas bisnis dengan pasar eksternal.',type:'likert5',maxVal:5,
-    questions:[
-      {id:'ect_oh32',text:'Kemampuan bisnis kami menjangkau pasar atau pelanggan baru sangat baik'},
-      {id:'ect_oh33',text:'Pertumbuhan penjualan bisnis kami selama setahun terakhir sangat memuaskan'},
-      {id:'ect_oh34',text:'Liabilitas bisnis kami (pinjaman, utang) sangat dapat dikelola'},
-      {id:'ect_oh35',text:'Situasi arus kas bisnis kami sangat sehat dan stabil'},
     ]},
 };
 
@@ -70,6 +70,54 @@ const EMPLOYEE_QUESTIONS = {
     ]},
 };
 
+// ── Draft Preview Modal ────────────────────────────────────────
+function openPreviewModal() {
+  const groups = getActiveGroups();
+  let html = `<div style="margin-bottom:15px;font-size:13px;color:var(--gray-600)">Berikut adalah ringkasan dari jawaban yang telah Anda centang:</div>`;
+  let allAnswered = true;
+  let totalMissing = 0;
+
+  groups.forEach(g => {
+    let answered = 0;
+    g.questions.forEach(q => {
+      if (document.querySelector(`input[name="${q.id}"]:checked`)) answered++;
+    });
+    const missing = g.questions.length - answered;
+    if (missing > 0) { allAnswered = false; totalMissing += missing; }
+
+    const ve = document.getElementById(`calc-${g.key}`);
+    const scoreText = ve && ve.textContent !== '--' ? ve.textContent : 'Belum ada data';
+    const color = missing > 0 ? 'var(--danger)' : 'var(--success)';
+
+    html += `
+      <div style="border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-bottom:10px;background:${missing>0?'#fef2f2':'#f0fdf4'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <strong style="color:var(--gray-800);font-size:13px">${g.label}</strong>
+          <span style="font-weight:700;font-size:14px;color:${color}">${scoreText}</span>
+        </div>
+        <div style="font-size:11px;color:var(--gray-500)">
+          Progres: ${answered} / ${g.questions.length} dijawab ${missing > 0 ? `<span style="color:var(--danger);font-weight:600">(${missing} terlewat)</span>` : ''}
+        </div>
+      </div>
+    `;
+  });
+
+  if (!allAnswered) {
+    html = `<div style="background:#fee2e2;color:#b91c1c;padding:12px;border-radius:8px;margin-bottom:15px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Peringatan: Ada ${totalMissing} pertanyaan yang belum Anda isi!
+    </div>` + html;
+  } else {
+    html = `<div style="background:#d1fae5;color:#047857;padding:12px;border-radius:8px;margin-bottom:15px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      Luar biasa! Seluruh pertanyaan telah terjawab dengan lengkap.
+    </div>` + html;
+  }
+
+  document.getElementById('previewModalBody').innerHTML = html;
+  showModal('previewModal');
+}
+
 // ── Timer ──────────────────────────────────────────────────────
 let _formStartTime = null;
 
@@ -80,7 +128,7 @@ function getActiveGroups() {
   const r = getCurrentRole();
   return r === 'employee'
     ? [EMPLOYEE_QUESTIONS.OV, EMPLOYEE_QUESTIONS.LDI, EMPLOYEE_QUESTIONS.WEQ]
-    : [OWNER_QUESTIONS.INS, OWNER_QUESTIONS.OPS, OWNER_QUESTIONS.ECT];
+    : [OWNER_QUESTIONS.INS, OWNER_QUESTIONS.ECT, OWNER_QUESTIONS.OPS];
 }
 
 // ── Build sidebar calc rows ────────────────────────────────────
@@ -303,7 +351,7 @@ async function saveEvaluasi() {
     }
 
     // Refresh semua chart & data dengan total terbaru
-    if (typeof refreshAllCharts === 'function') refreshAllCharts();
+    if (typeof refreshAllCharts === 'function') await refreshAllCharts();
 
     showFeedbackPopup(res.data, elapsed);
     _formStartTime = null;
@@ -352,7 +400,7 @@ function showFeedbackPopup(data, elapsed) {
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
         <h2 style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">Kuesioner Berhasil Disimpan!</h2>
-        <p style="font-size:13px;color:var(--gray-500)">Data telah tersimpan ke database NexaUMKM</p>
+        <p style="font-size:13px;color:var(--gray-500)">Data telah tersimpan ke database UMGORIA</p>
       </div>
 
       <!-- Stats row -->

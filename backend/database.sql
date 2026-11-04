@@ -1,5 +1,5 @@
 -- ============================================================
---  NexaUMKM Database Schema
+--  UMGORIA Database Schema
 --  Engine : MySQL 8.0+ / MariaDB 10.5+
 --  Charset: utf8mb4_unicode_ci
 --
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   KEY `idx_role` (`role`),
   KEY `idx_sektor` (`sektor`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  COMMENT='Akun pengguna NexaUMKM (owner & pegawai)';
+  COMMENT='Akun pengguna UMGORIA (owner & pegawai)';
 
 
 -- ============================================================

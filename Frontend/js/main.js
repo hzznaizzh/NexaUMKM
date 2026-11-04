@@ -10,11 +10,10 @@ const AppState = {
   currentPage:  1,
   pageSize:     6,
   activeFilter: 'semua',
+  dataLoadFailed: false,
 
-  // Total UMKM — single source of truth
   get totalUmkm() {
-    const dbCount = (this.umkmData || []).filter(x => x.isNew).length;
-    return 428 + dbCount;
+    return this.umkmData.length;
   },
   addUmkm() {
     return this.totalUmkm + 1;
@@ -77,82 +76,24 @@ function navigate(page) {
 }
 
 function renderNotifications() {
-  const data = AppState.filteredData || AppState.umkmData || [];
-  const total = data.length;
-  
-  const user = AppState.currentUser || { displayName: 'User' };
+  const records = AppState.umkmData || [];
+  const user = AppState.currentUser || { displayName: 'Pengguna' };
   safeSet('notif-halo', 'Halo, ' + user.displayName + '!');
-  
-  let insVal = '1.79';
-  if (AppState.dashboardStats && AppState.dashboardStats.factor_averages && AppState.dashboardStats.factor_averages.avg_ins_5) {
-    insVal = parseFloat(AppState.dashboardStats.factor_averages.avg_ins_5).toFixed(2);
+  const notificationCount = records.length ? 1 : 0;
+  safeSet('notif-badge-count-text', notificationCount);
+  safeSet('notif-badge-num', String(notificationCount).padStart(2, '0'));
+
+  const list = document.getElementById('notif-list-container');
+  if (!list) return;
+  if (!records.length) {
+    list.innerHTML = '<div class="notif-item primary"><div class="notif-item-content"><div class="notif-item-title">Belum ada hasil asesmen</div><div class="notif-item-desc">Hasil penilaian akan muncul setelah kuesioner dikirim dan tersimpan.</div></div></div>';
+    return;
   }
 
-  let sum = 0;
-  let scores5 = [];
-  data.forEach(u => {
-     let s5 = u.skor / 20;
-     if (s5 === 0) s5 = 1.0;
-     scores5.push(s5);
-     sum += s5;
-  });
-  const mean = total > 0 ? sum / total : 0;
-  let sumSq = 0;
-  scores5.forEach(s => sumSq += (s - mean)*(s - mean));
-  const sd = total > 0 ? Math.sqrt(sumSq / total) : 0;
-
-  let outlierIDs = [];
-  data.forEach(u => {
-     let s5 = u.skor / 20;
-     if (s5 === 0) s5 = 1.0;
-     let z = sd === 0 ? 0 : Math.abs(s5 - mean) / sd;
-     if (z > 2.5) outlierIDs.push(u.id);
-  });
-  
-  let outlierText = '';
-  if (outlierIDs.length > 0) {
-      outlierText = ' (ID ' + outlierIDs.join(', ') + ')';
-  }
-  
-  const listContainer = document.getElementById('notif-list-container');
-  if (listContainer) {
-    listContainer.innerHTML = `
-        <div class="notif-item success">
-          <div class="notif-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-          <div class="notif-item-content">
-            <div class="notif-item-type">ANALISIS BERHASIL</div>
-            <div class="notif-item-title">Analisis Selesai: Dataset ${total} UMKM</div>
-            <div class="notif-item-desc">Laporan kesehatan organisasi untuk batch ${total} responden telah divalidasi. Nilai rata-rata INS (Sumber Daya) tercatat sebesar ${insVal.replace('.', ',')}.</div>
-          </div>
-          <div class="notif-item-time">2 mnt yang lalu</div>
-        </div>
-
-        <div class="notif-item danger">
-          <div class="notif-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-          <div class="notif-item-content">
-            <div class="notif-item-type">PERINGATAN KRITIS</div>
-            <div class="notif-item-title">Peringatan Distribusi: Outlier Terdeteksi</div>
-            <div class="notif-item-desc">Ditemukan ${outlierIDs.length} UMKM dengan performa ekstrim${outlierText} yang berada jauh di atas rata-rata populasi. Segera tinjau anomali data.</div>
-          </div>
-          <div class="notif-item-time">45 mnt yang lalu</div>
-        </div>
-
-        <div class="notif-item primary">
-          <div class="notif-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
-          <div class="notif-item-content">
-            <div class="notif-item-type">LAPORAN BARU</div>
-            <div class="notif-item-title">Sistem: Skala Penilaian Diperbarui</div>
-            <div class="notif-item-desc">Skala frekuensi distribusi kini telah disesuaikan menjadi 1-4 sesuai dengan standar pelaporan statistika terbaru.</div>
-          </div>
-          <div class="notif-item-time">2 jam yang lalu</div>
-        </div>
-    `;
-  }
+  const latest = [...records].sort((a, b) => new Date(b.tanggal || 0) - new Date(a.tanggal || 0))[0];
+  const latestDate = latest.tanggal ? new Date(String(latest.tanggal).replace(' ', 'T')).toLocaleDateString('id-ID') : 'Tanggal tidak tersedia';
+  list.innerHTML = `<div class="notif-item success"><div class="notif-item-content"><div class="notif-item-type">ASESMEN TERSIMPAN</div><div class="notif-item-title">${records.length} hasil asesmen tersedia</div><div class="notif-item-desc">Asesmen terbaru tercatat pada ${latestDate}. Rincian skor dapat dilihat pada dashboard.</div></div><div class="notif-item-time">${latestDate}</div></div>`;
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  USER DISPLAY  — nama pengguna di topbar & seluruh halaman
-// ═══════════════════════════════════════════════════════════════
 function updateUserDisplay() {
   const user = AppState.currentUser;
   if (!user) return;
@@ -190,114 +131,64 @@ function updateUserDisplay() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  MASTER UMKM DATA  (30 data dummy + data dari DB)
+//  MASTER UMKM DATA  (Data dari CSV & Database)
 // ═══════════════════════════════════════════════════════════════
-const DUMMY_UMKM = [
-  { id:'001', nama:'Kopi Senja',         lokasi:'Jakarta Selatan', sektor:'Kuliner',    omzet:'50Jt',  skor:75,  faktor:'Kekuatan: Budaya',      rek:'Efisiensi Biaya' },
-  { id:'002', nama:'Batik Nusantara',    lokasi:'Solo',            sektor:'Kerajinan',  omzet:'80Jt',  skor:82,  faktor:'Kekuatan: Kinerja',     rek:'Digitalisasi Pasar' },
-  { id:'003', nama:'Toko Makmur',        lokasi:'Bandung',         sektor:'Ritel',      omzet:'40Jt',  skor:45,  faktor:'Kelemahan: Inventori',  rek:'Manajemen Inventori' },
-  { id:'004', nama:'Warung Abadi',       lokasi:'Surabaya',        sektor:'Kuliner',    omzet:'65Jt',  skor:91,  faktor:'Kekuatan: Loyalitas',   rek:'Ekspansi Regional' },
-  { id:'005', nama:'Seni Ukir Jaya',     lokasi:'Bali',            sektor:'Kerajinan',  omzet:'120Jt', skor:88,  faktor:'Kekuatan: Ekspor',      rek:'Diversifikasi Produk' },
-  { id:'006', nama:'Pasar Bersih',       lokasi:'Tangerang',       sektor:'Ritel',      omzet:'25Jt',  skor:32,  faktor:'Kelemahan: Cashflow',   rek:'Restrukturisasi Utang' },
-  { id:'007', nama:'Warung Bu Tini',     lokasi:'Yogyakarta',      sektor:'Kuliner',    omzet:'30Jt',  skor:68,  faktor:'Kekuatan: Pelayanan',   rek:'Perluasan Menu' },
-  { id:'008', nama:'Tenun Asli',         lokasi:'Lombok',          sektor:'Kerajinan',  omzet:'95Jt',  skor:84,  faktor:'Kekuatan: Produk',      rek:'Ekspor ke Luar Negeri' },
-  { id:'009', nama:'Minimarket Sejahtera',lokasi:'Depok',          sektor:'Ritel',      omzet:'200Jt', skor:77,  faktor:'Kekuatan: Lokasi',      rek:'Franchise' },
-  { id:'010', nama:'Dapur Ibu',          lokasi:'Semarang',        sektor:'Kuliner',    omzet:'45Jt',  skor:61,  faktor:'Kekuatan: Rasa',        rek:'Catering' },
-  { id:'011', nama:'Batik Pekalongan',   lokasi:'Pekalongan',      sektor:'Kerajinan',  omzet:'75Jt',  skor:79,  faktor:'Kekuatan: Tradisi',     rek:'Platform Online' },
-  { id:'012', nama:'Toko Herbal Sehat',  lokasi:'Bogor',           sektor:'Kesehatan',  omzet:'55Jt',  skor:86,  faktor:'Kekuatan: Produk',      rek:'Sertifikasi BPOM' },
-  { id:'013', nama:'Grosir Murah',       lokasi:'Bekasi',          sektor:'Ritel',      omzet:'300Jt', skor:58,  faktor:'Kelemahan: Margin',     rek:'Manajemen Stok' },
-  { id:'014', nama:'Keripik Bu Endah',   lokasi:'Malang',          sektor:'Kuliner',    omzet:'35Jt',  skor:72,  faktor:'Kekuatan: Kemasan',     rek:'Ekspansi Distribusi' },
-  { id:'015', nama:'Anyaman Kalimantan', lokasi:'Banjarmasin',     sektor:'Kerajinan',  omzet:'60Jt',  skor:90,  faktor:'Kekuatan: Unik',        rek:'Kerjasama Retail' },
-  { id:'016', nama:'Apotek Sehat',       lokasi:'Medan',           sektor:'Kesehatan',  omzet:'180Jt', skor:83,  faktor:'Kekuatan: Kepercayaan', rek:'Layanan Online' },
-  { id:'017', nama:'Nasi Padang Asli',   lokasi:'Padang',          sektor:'Kuliner',    omzet:'70Jt',  skor:78,  faktor:'Kekuatan: Autentik',    rek:'Buka Cabang' },
-  { id:'018', nama:'Toko Bangunan Maju', lokasi:'Surabaya',        sektor:'Ritel',      omzet:'400Jt', skor:64,  faktor:'Kelemahan: SDM',        rek:'Pelatihan Karyawan' },
-  { id:'019', nama:'Keramik Indah',      lokasi:'Yogyakarta',      sektor:'Kerajinan',  omzet:'50Jt',  skor:87,  faktor:'Kekuatan: Desain',      rek:'Galeri Online' },
-  { id:'020', nama:'Catering Berkah',    lokasi:'Jakarta Timur',   sektor:'Kuliner',    omzet:'90Jt',  skor:76,  faktor:'Kekuatan: Jaringan',    rek:'Digitalisasi Pesanan' },
-  { id:'021', nama:'Klinik Herbal Jaya', lokasi:'Bandung',         sektor:'Kesehatan',  omzet:'65Jt',  skor:81,  faktor:'Kekuatan: Konsultan',   rek:'Aplikasi Telemedicine' },
-  { id:'022', nama:'Jajanan Pasar Mbok', lokasi:'Solo',            sektor:'Kuliner',    omzet:'20Jt',  skor:55,  faktor:'Kelemahan: Higienitas', rek:'Sertifikasi Halal' },
-  { id:'023', nama:'Toko Elektronik Maju',lokasi:'Makassar',       sektor:'Ritel',      omzet:'250Jt', skor:70,  faktor:'Kelemahan: Garansi',    rek:'After-Sales Service' },
-  { id:'024', nama:'Ukiran Jepara',      lokasi:'Jepara',          sektor:'Kerajinan',  omzet:'110Jt', skor:89,  faktor:'Kekuatan: Keahlian',    rek:'Export Premium' },
-  { id:'025', nama:'Pecel Lele Bu Sari', lokasi:'Tangerang Selatan',sektor:'Kuliner',   omzet:'28Jt',  skor:63,  faktor:'Kelemahan: Modal',      rek:'KUR BRI' },
-  { id:'026', nama:'Toko Buku Cerdas',   lokasi:'Bandung',         sektor:'Ritel',      omzet:'35Jt',  skor:74,  faktor:'Kekuatan: Komunitas',   rek:'Toko Online' },
-  { id:'027', nama:'Batik Madura',       lokasi:'Pamekasan',       sektor:'Kerajinan',  omzet:'80Jt',  skor:85,  faktor:'Kekuatan: Heritage',    rek:'Branding Digital' },
-  { id:'028', nama:'Warung Sehat Alami', lokasi:'Bogor',           sektor:'Kesehatan',  omzet:'42Jt',  skor:80,  faktor:'Kekuatan: Organik',     rek:'Sertifikasi Organik' },
-  { id:'029', nama:'Sembako Murah Pak Budi',lokasi:'Jakarta Utara',sektor:'Ritel',      omzet:'120Jt', skor:48,  faktor:'Kelemahan: Persaingan', rek:'Diferensiasi Produk' },
-  { id:'030', nama:'Rendang Bu Fatimah', lokasi:'Bukittinggi',     sektor:'Kuliner',    omzet:'55Jt',  skor:92,  faktor:'Kekuatan: Resep',       rek:'Kemasan Premium' },
-];
+
+let isFetchingUmkm = false;
 
 async function loadUmkmData() {
-  // Mulai dari 30 data dummy
-  AppState.umkmData = [...DUMMY_UMKM];
-
-  // Lengkapi sisa data dummy secara dinamis dari 031 hingga 428 agar berjumlah 428 sebagai base populasi
-  const sectors = ['Kuliner', 'Kerajinan', 'Ritel', 'Kesehatan'];
-  const locations = ['Jakarta Selatan', 'Solo', 'Bandung', 'Surabaya', 'Semarang', 'Yogyakarta', 'Medan', 'Makassar', 'Bali', 'Depok', 'Malang', 'Bogor'];
-  const factorsStrong = ['Kekuatan: Budaya', 'Kekuatan: Kinerja', 'Kekuatan: Loyalitas', 'Kekuatan: Produk', 'Kekuatan: Lokasi', 'Kekuatan: Rasa', 'Kekuatan: Tradisi', 'Kekuatan: Kepercayaan'];
-  const factorsWeak = ['Kelemahan: Inventori', 'Kelemahan: Cashflow', 'Kelemahan: Margin', 'Kelemahan: SDM', 'Kelemahan: Higienitas', 'Kelemahan: Garansi', 'Kelemahan: Modal', 'Kelemahan: Persaingan'];
-  const recommendations = ['Efisiensi Biaya', 'Digitalisasi Pasar', 'Manajemen Inventori', 'Ekspansi Regional', 'Diversifikasi Produk', 'Platform Online', 'Sertifikasi BPOM', 'Manajemen Stok'];
-
-  // Seeded random number generator agar data dummy konsisten setiap kali halaman dimuat ulang
-  let seed = 12345;
-  function random() {
-    let x = Math.sin(seed++) * 10000;
-    return x - Math.floor(x);
+  if (AppState.umkmData && AppState.umkmData.length > 0) return;
+  if (isFetchingUmkm) {
+    while (isFetchingUmkm) await new Promise(r => setTimeout(r, 50));
+    return;
   }
 
-  for (let i = 31; i <= 428; i++) {
-    const sector = sectors[Math.floor(random() * sectors.length)];
-    const location = locations[Math.floor(random() * locations.length)];
-    const skor = Math.floor(random() * 56) + 40; // Skor dari 40 sampai 95
-    const isStrong = skor >= 70;
-    const factor = isStrong 
-      ? factorsStrong[Math.floor(random() * factorsStrong.length)]
-      : factorsWeak[Math.floor(random() * factorsWeak.length)];
-    const rek = recommendations[Math.floor(random() * recommendations.length)];
-    const omzet = (Math.floor(random() * 280) + 20) + 'Jt';
-
-    AppState.umkmData.push({
-      id: String(i).padStart(3, '0'),
-      nama: `UMKM ${sector} ${location} ${i}`,
-      lokasi: location,
-      sektor: sector,
-      omzet: omzet,
-      skor: skor,
-      faktor: factor,
-      rek: rek
-    });
-  }
-
+  isFetchingUmkm = true;
+  AppState.dataLoadFailed = false;
   try {
-    const res = await DashboardAPI.getUmkmList({ limit: 1000 });
-    if (res && res.ok && res.data && Array.isArray(res.data.rows)) {
-      const dbRows = res.data.rows;
-      const dbEntries = dbRows.map((r, index) => {
+    const rows = [];
+    let totalRows = 0;
+    do {
+      const res = await DashboardAPI.getUmkmList({ limit: 100, offset: rows.length });
+      if (!res || !res.ok || !res.data || !Array.isArray(res.data.rows)) {
+        throw new Error(res?.message || 'Respons daftar asesmen tidak valid.');
+      }
+      rows.push(...res.data.rows);
+      totalRows = Number(res.data.total) || rows.length;
+    } while (rows.length < totalRows && rows.length > 0);
+
+    AppState.umkmData = rows.map(row => {
+        const scoreOn5 = row.score_on_5 == null ? null : Number(row.score_on_5);
+        const scoreFactor = key => row[`score_${key}`] == null ? null : Number(row[`score_${key}`]) * 5;
+        const omzet = Number(row.omzet);
+
         return {
-          id:     String(428 + index + 1).padStart(3, '0'),
-          nama:   r.umkm_name || 'UMKM Baru',
-          lokasi: r.lokasi    || '-',
-          sektor: r.sektor    || '-',
-          omzet: (function() {
-            const val = r.omzet;
-            if (!val) return '-';
-            const num = parseInt(val);
-            if (isNaN(num) || num === 0) return '-';
-            if (num >= 1000000) return (num / 1000000).toFixed(0) + 'Jt';
-            if (num >= 1000)    return (num / 1000).toFixed(0) + 'Rb';
-            return num + '';
-          })(),
-          skor:   r.score_on_5 ? Math.round((r.score_on_5 / 5) * 100) : 0,
-          faktor: (r.score_on_5 || 0) >= 3 ? 'Kekuatan: Operasional' : 'Kelemahan: Perlu Perhatian',
-          rek:    r.health_category === 'SANGAT BAIK' ? 'Pertahankan Kinerja'
-                : r.health_category === 'BAIK'        ? 'Optimalisasi Proses'
-                : r.health_category === 'CUKUP'       ? 'Peningkatan SDM'
-                : 'Intervensi Segera',
-          isNew: true,
+          id: String(row.submission_id),
+          nama: row.umkm_name || '—',
+          lokasi: row.lokasi || '—',
+          sektor: row.sektor || '—',
+          omzet: Number.isFinite(omzet) && omzet > 0 ? 'Rp ' + omzet.toLocaleString('id-ID') : '—',
+          skor: Number.isFinite(scoreOn5) ? Math.round((scoreOn5 / 5) * 100) : null,
+          scoreOn5,
+          faktor: '—',
+          rek: row.health_category || '—',
+          tanggal: row.submitted_at || null,
+          scores: {
+            ov: scoreFactor('ov'),
+            ldi: scoreFactor('ldi'),
+            ins: scoreFactor('ins'),
+            ops: scoreFactor('ops'),
+            weq: scoreFactor('weq'),
+            ect: scoreFactor('ect')
+          }
         };
       });
-      AppState.umkmData = [...AppState.umkmData, ...dbEntries];
-    }
-  } catch(e) {
-    console.error('Failed to load UMKM data from database:', e);
+  } catch (error) {
+    console.error('Failed to load UMKM data from database:', error);
+    AppState.dataLoadFailed = true;
+    showToast('Data asesmen belum dapat dimuat dari server.', 'error');
+  } finally {
+    isFetchingUmkm = false;
   }
 
   AppState.filteredData = [...AppState.umkmData];
@@ -336,7 +227,16 @@ function handleSearch(val) {
 // ═══════════════════════════════════════════════════════════════
 function applyFilter(data, filter) {
   if (!filter || filter === 'semua') return data;
-  return data.filter(u => u.sektor.toLowerCase().includes(filter.toLowerCase()));
+  const f = filter.toLowerCase();
+
+  if (f === 'agribisnis') {
+    return data.filter(u => {
+      const sek = u.sektor.toLowerCase();
+      return sek.includes('pertanian') || sek.includes('perkebunan') || sek.includes('agribisnis');
+    });
+  }
+
+  return data.filter(u => u.sektor.toLowerCase().includes(f));
 }
 
 function filterByKategori(kategori) {
@@ -371,6 +271,11 @@ function filterUmkmTable(sektor) {
 // ═══════════════════════════════════════════════════════════════
 function renderUmkmTable() {
   if (!AppState.umkmData.length) {
+    if (AppState.dataLoadFailed) {
+      const tbody = document.getElementById('umkmTableBody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-500)">Data belum dapat dimuat. Periksa koneksi, lalu coba lagi.</td></tr>';
+      return;
+    }
     loadUmkmData().then(() => renderUmkmTable());
     return;
   }
@@ -390,7 +295,7 @@ function renderUmkmTable() {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-400)">Tidak ada data ditemukan</td></tr>`;
   } else {
     tbody.innerHTML = slice.map(u => {
-      const scoreClass = u.skor >= 80 ? 'score-great' : u.skor >= 70 ? 'score-good' : u.skor >= 50 ? 'score-mid' : 'score-bad';
+      const scoreClass = u.skor === null ? '' : u.skor >= 80 ? 'score-great' : u.skor >= 60 ? 'score-good' : u.skor >= 40 ? 'score-mid' : 'score-bad';
       const sektorClass = u.sektor.toLowerCase().includes('kuliner') ? 'sector-kuliner'
                         : u.sektor.toLowerCase().includes('kerajinan') ? 'sector-kerajinan'
                         : u.sektor.toLowerCase().includes('ritel') ? 'sector-ritel'
@@ -403,7 +308,7 @@ function renderUmkmTable() {
         <td>${u.lokasi}</td>
         <td><span class="sector-badge ${sektorClass}">${u.sektor.toUpperCase()}</span></td>
         <td>${u.omzet}</td>
-        <td><div class="health-score ${scoreClass}">${u.skor}</div></td>
+        <td><div class="health-score ${scoreClass}">${u.skor === null ? '—' : u.skor}</div></td>
         <td class="${faktorClass}">${u.faktor}</td>
         <td>${u.rek}</td>
       </tr>`;
@@ -418,9 +323,10 @@ function renderUmkmTable() {
   renderPaginationBtns(page, totalPages);
 
   // Update stats
-  const avgSkor = data.length ? Math.round(data.reduce((a,b) => a + b.skor, 0) / data.length) : 0;
+  const scored = data.filter(record => Number.isFinite(record.scoreOn5));
+  const avgSkor = scored.length ? (scored.reduce((sum, record) => sum + record.scoreOn5, 0) / scored.length).toFixed(2) : '—';
   safeSet('stat-total-rec', total);
-  safeSet('stat-avg-rec', avgSkor + '/100');
+  safeSet('stat-avg-rec', avgSkor + (avgSkor === '—' ? '' : '/5'));
 }
 
 function renderPaginationBtns(current, total) {
@@ -471,7 +377,7 @@ function showUmkmDetail(id) {
 //  EXPORT DATA (CSV)
 // ═══════════════════════════════════════════════════════════════
 function exportData() {
-  const data = AppState.filteredData.length ? AppState.filteredData : AppState.umkmData;
+  const data = AppState.filteredData;
   const headers = ['ID','Nama UMKM','Lokasi','Sektor','Omzet','Skor Kesehatan','Faktor Utama','Rekomendasi'];
   const rows = data.map(u => [u.id, u.nama, u.lokasi, u.sektor, u.omzet, u.skor, u.faktor, u.rek]
     .map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
@@ -480,7 +386,7 @@ function exportData() {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = `NexaUMKM_Data_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `UMGORIA_Data_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('Data berhasil diekspor sebagai CSV', 'success');
@@ -492,43 +398,40 @@ function exportData() {
 function showProtokol(jenis) {
   const protokols = {
     ins: {
-      title: 'Protokol: Sesuaikan Titrasi INS',
-      priority: 'PRIORITAS TINGGI',
-      color: '#dc2626',
+      title: 'Tinjau Kelembagaan (INS)',
+      priority: 'PANDUAN UMUM',
+      color: '#54758a',
       steps: [
-        'Lakukan audit sumber daya kelembagaan dalam 24 jam',
-        'Identifikasi gap antara kebutuhan dan ketersediaan NIB',
-        'Jadwalkan konsultasi dengan Dinas Koperasi setempat',
-        'Susun roadmap pengajuan bantuan pendanaan pemerintah',
-        'Monitor progress setiap 2 minggu',
+        'Periksa kelengkapan administrasi usaha yang relevan.',
+        'Tinjau pembagian peran dan tanggung jawab dalam organisasi.',
+        'Catat kebutuhan dukungan atau sumber daya yang belum terpenuhi.',
+        'Pilih satu tindak lanjut yang realistis dan tentukan penanggung jawab.',
       ],
-      eta: '7 hari',
+      eta: 'Sesuaikan kebutuhan usaha',
     },
     ect: {
-      title: 'Protokol: Penyelarasan Siklus ECT',
-      priority: 'PRIORITAS SEDANG',
-      color: '#d97706',
+      title: 'Tinjau Faktor Eksternal (ECT)',
+      priority: 'PANDUAN UMUM',
+      color: '#b88a42',
       steps: [
-        'Analisis konektivitas pasar saat ini vs benchmark industri',
-        'Mapping pelanggan potensial di segmen baru',
-        'Evaluasi struktur utang dan arus kas triwulan',
-        'Buat strategi penetrasi pasar digital',
-        'Review bulanan dengan tim manajemen',
+        'Tinjau perubahan kebutuhan pelanggan dan kondisi pasar.',
+        'Petakan hubungan usaha dengan pemasok, mitra, dan komunitas.',
+        'Periksa kewajiban perizinan atau kepatuhan yang berlaku.',
+        'Pilih peluang atau risiko eksternal yang perlu ditindaklanjuti.',
       ],
-      eta: '48 jam',
+      eta: 'Sesuaikan kebutuhan usaha',
     },
     bio: {
-      title: 'Protokol: Cek Sinkronisasi Biometrik',
-      priority: 'PEMELIHARAAN',
-      color: '#059669',
+      title: 'Susun Rencana Pengembangan',
+      priority: 'LANGKAH TINDAK LANJUT',
+      color: '#54758a',
       steps: [
-        'Validasi data periferal standar organisasi',
-        'Pastikan semua baseline klinis optimal',
-        'Dokumentasi kondisi saat ini untuk arsip',
-        'Jadwalkan pemindaian rutin berikutnya',
-        'Konfirmasi tidak ada anomali baru',
+        'Pilih faktor yang ingin ditinjau berdasarkan hasil asesmen.',
+        'Tentukan tujuan kecil dan langkah yang dapat dilakukan.',
+        'Tetapkan penanggung jawab serta waktu evaluasi.',
+        'Catat perkembangan untuk dibandingkan pada asesmen berikutnya.',
       ],
-      eta: 'Tervalidasi',
+      eta: 'Ditentukan oleh pemilik usaha',
     },
   };
 
@@ -552,10 +455,10 @@ function showProtokol(jenis) {
           </div>`).join('')}
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;background:var(--gray-50);border-radius:10px;padding:12px 16px">
-        <span style="font-size:12px;color:var(--gray-500)">Estimasi waktu penyelesaian</span>
+        <span style="font-size:12px;color:var(--gray-500)">Waktu tindak lanjut</span>
         <span style="font-size:13px;font-weight:700;color:${p.color}">${p.eta}</span>
       </div>
-      <button onclick="this.closest('[style]').remove()" style="width:100%;margin-top:16px;padding:12px;background:var(--primary);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">Tandai Selesai</button>
+      <button onclick="this.closest('[style]').remove()" style="width:100%;margin-top:16px;padding:12px;background:var(--primary);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">Tutup panduan</button>
     </div>
     <style>@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}</style>`;
   document.body.appendChild(popup);
@@ -567,447 +470,301 @@ function showProtokol(jenis) {
 // ═══════════════════════════════════════════════════════════════
 async function loadDashboardData() {
   try {
-    const res = await DashboardAPI.getStats();
-    if (!res || !res.ok) return;
-    const { stats, factor_averages: fa } = res.data || {};
-    if (!stats) return;
+    const response = await DashboardAPI.getStats();
+    if (!response || !response.ok || !response.data) {
+      throw new Error(response?.message || 'Ringkasan asesmen tidak dapat dimuat.');
+    }
 
-    AppState.dashboardStats = stats;
-    AppState.factorAverages = fa;
-
-    // Gunakan nilai TERBESAR antara DB dan local
-    const dbTotal    = parseInt(stats.total_umkm) || 0;
-
+    AppState.dashboardStats = response.data.stats || {};
+    AppState.factorAverages = response.data.factor_averages || {};
+    await loadUmkmData();
     applyDynamicData();
-  } catch (e) { /* silent */ }
+  } catch (error) {
+    console.error('Failed to load dashboard data:', error);
+    showToast('Ringkasan asesmen belum dapat dimuat dari server.', 'error');
+  }
+}
+
+function getFactorAverage(key) {
+  const value = AppState.factorAverages?.[`avg_${key}_5`];
+  if (value === null || value === undefined || value === '') return null;
+  const score = Number(value);
+  return Number.isFinite(score) ? score : null;
+}
+
+function getHealthCategory(record) {
+  const category = String(record.rek || '').toUpperCase();
+  if (['PERLU PERHATIAN', 'CUKUP', 'BAIK', 'SANGAT BAIK'].includes(category)) return category;
+  if (!Number.isFinite(record.scoreOn5)) return null;
+  if (record.scoreOn5 < 2) return 'PERLU PERHATIAN';
+  if (record.scoreOn5 < 3) return 'CUKUP';
+  if (record.scoreOn5 < 4) return 'BAIK';
+  return 'SANGAT BAIK';
+}
+
+function getHealthCategoryCounts() {
+  const counts = { 'PERLU PERHATIAN': 0, CUKUP: 0, BAIK: 0, 'SANGAT BAIK': 0 };
+  AppState.umkmData.forEach(record => {
+    const category = getHealthCategory(record);
+    if (category) counts[category] += 1;
+  });
+  return counts;
 }
 
 function applyDynamicData() {
-  if (!AppState.dashboardStats || !AppState.factorAverages) return;
-  const stats = AppState.dashboardStats;
-  const fa = AppState.factorAverages;
-  const total = Math.max(parseInt(stats.total_umkm) || 0, AppState.totalUmkm);
+  const stats = AppState.dashboardStats || {};
+  const total = Number(stats.total_umkm) || AppState.umkmData.length;
+  const valid = Number(stats.total_valid) || 0;
+  const categoryCounts = getHealthCategoryCounts();
+  const factorScores = {
+    ins: getFactorAverage('ins'),
+    ov: getFactorAverage('ov'),
+    ldi: getFactorAverage('ldi'),
+    weq: getFactorAverage('weq'),
+    ops: getFactorAverage('ops'),
+    ect: getFactorAverage('ect')
+  };
 
   updateTotalDisplay(total);
-  updateDonutLegend(total);
-  
-  const sehatCount = parseInt(stats.sehat_count) || 0;
-  const totalValid = parseInt(stats.total_valid) || 1;
-  const sehatPct   = total > 0 ? Math.round((sehatCount / totalValid) * 100) + '%' : '--';
-  safeSet('stat-sehat-pct',   sehatPct);
-  safeSet('stat-best-score',  stats.best_score  || '--');
-  safeSet('stat-worst-score', stats.worst_score || '--');
+  updateDonutLegend(categoryCounts);
+  safeSet('stat-sehat-pct', valid ? Math.round((Number(stats.sehat_count) || 0) / valid * 100) + '%' : '—');
+  safeSet('stat-best-score', stats.best_score == null ? '—' : Number(stats.best_score).toFixed(2));
+  safeSet('stat-worst-score', stats.worst_score == null ? '—' : Number(stats.worst_score).toFixed(2));
 
-  if (window.donutChartInst && total > 0) {
-    const buruk = Math.round(total * 0.065);
-    const baik  = Math.round(total * 0.194);
-    const cukup = total - buruk - baik;
-    window.donutChartInst.data.datasets[0].data = [buruk, cukup, baik, 0];
+  if (window.donutChartInst) {
+    window.donutChartInst.data.datasets[0].data = [
+      categoryCounts['PERLU PERHATIAN'], categoryCounts.CUKUP,
+      categoryCounts.BAIK, categoryCounts['SANGAT BAIK']
+    ];
     window.donutChartInst.update('none');
   }
 
-  if (fa && window.barChartInst) {
-    const live = [
-      (fa.avg_ov_5  !== undefined && fa.avg_ov_5  !== null) ? parseFloat(fa.avg_ov_5)  : 3.41,
-      (fa.avg_ops_5 !== undefined && fa.avg_ops_5 !== null) ? parseFloat(fa.avg_ops_5) : 2.38,
-      (fa.avg_weq_5 !== undefined && fa.avg_weq_5 !== null) ? parseFloat(fa.avg_weq_5) : 3.31,
-      (fa.avg_ins_5 !== undefined && fa.avg_ins_5 !== null) ? parseFloat(fa.avg_ins_5) : 1.79,
-      (fa.avg_ldi_5 !== undefined && fa.avg_ldi_5 !== null) ? parseFloat(fa.avg_ldi_5) : 2.95,
-      (fa.avg_ect_5 !== undefined && fa.avg_ect_5 !== null) ? parseFloat(fa.avg_ect_5) : 1.80,
-    ];
-    window.barChartInst.data.datasets[0].data = live;
-    window.barChartInst.options.animation = { duration: 600, easing: 'easeOutQuart' };
-    window.barChartInst.update();
+  const barValues = [factorScores.ov, factorScores.ops, factorScores.weq, factorScores.ins, factorScores.ldi, factorScores.ect];
+  if (window.barChartInst) {
+    window.barChartInst.data.datasets[0].data = barValues;
+    window.barChartInst.update('none');
   }
-
-  if (fa && window.spiderChartInst) {
+  if (window.spiderChartInst) {
     window.spiderChartInst.data.datasets[0].data = [
-      (fa.avg_ins_5 !== undefined && fa.avg_ins_5 !== null) ? parseFloat(fa.avg_ins_5) : 1.79,
-      (fa.avg_ldi_5 !== undefined && fa.avg_ldi_5 !== null) ? parseFloat(fa.avg_ldi_5) : 2.95,
-      (fa.avg_weq_5 !== undefined && fa.avg_weq_5 !== null) ? parseFloat(fa.avg_weq_5) : 3.31,
-      (fa.avg_ov_5  !== undefined && fa.avg_ov_5  !== null) ? parseFloat(fa.avg_ov_5)  : 3.41,
-      (fa.avg_ops_5 !== undefined && fa.avg_ops_5 !== null) ? parseFloat(fa.avg_ops_5) : 2.38,
-      (fa.avg_ect_5 !== undefined && fa.avg_ect_5 !== null) ? parseFloat(fa.avg_ect_5) : 1.80,
+      factorScores.ins, factorScores.ldi, factorScores.weq,
+      factorScores.ov, factorScores.ops, factorScores.ect
     ];
-    window.spiderChartInst.update();
+    window.spiderChartInst.update('none');
   }
 
-  // Update UMKM & Recommendations bottom metrics dynamically
-  const countBuruk = Math.round(total * 0.065);
-  const complianceVal = total > 0 ? (100 - (countBuruk / total * 100)).toFixed(1) : 96.4;
-  safeSet('rec-compliance', complianceVal + '%');
-  safeSet('rec-critical', countBuruk + ' Peringatan');
-  const simulatedRespTime = (14.0 + (total % 10) / 5).toFixed(1);
-  safeSet('rec-resp-time', simulatedRespTime + ' Min');
-  const nextDate = new Date();
-  nextDate.setHours(nextDate.getHours() + 2);
-  nextDate.setMinutes(0);
-  const nextScan = nextDate.toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'});
-  safeSet('rec-next-scan', nextScan);
-
-  // Update Intervensi Strategis metrics
-  const protokolAktif = countBuruk > 0 ? countBuruk + 2 : 12;
-  safeSet('intv-protokol', protokolAktif);
-  
-  if (countBuruk > 35) {
-    safeSet('intv-skor', 'Kritis');
-    safeSet('intv-skor-sub', 'Sangat Tinggi');
-    const el = document.getElementById('intv-skor-sub');
-    if (el) el.className = 'intervensi-stat-sub warn';
-  } else if (countBuruk > 15) {
-    safeSet('intv-skor', 'Peringatan');
-    safeSet('intv-skor-sub', 'Tinggi');
-    const el = document.getElementById('intv-skor-sub');
-    if (el) el.className = 'intervensi-stat-sub warn';
-  } else {
-    safeSet('intv-skor', 'Normal');
-    safeSet('intv-skor-sub', 'Stabil');
-    const el = document.getElementById('intv-skor-sub');
-    if (el) el.className = 'intervensi-stat-sub';
-  }
-
-  const efisiensi = (sehatPct && sehatPct !== '--') ? sehatPct : '88%';
-  safeSet('intv-efisiensi', efisiensi);
-
-  if (fa) {
-    const insVal = (fa.avg_ins_5 !== undefined && fa.avg_ins_5 !== null) ? parseFloat(fa.avg_ins_5) : 1.79;
-    const ectVal = (fa.avg_ect_5 !== undefined && fa.avg_ect_5 !== null) ? parseFloat(fa.avg_ect_5) : 1.80;
-    
-    const insChange = insVal < 3.0 ? '-' + ((3.0 - insVal) * 10).toFixed(1) + '%' : '+' + ((insVal - 3.0) * 10).toFixed(1) + '%';
-    safeSet('intv-ins-val', insChange);
-    const elIns = document.getElementById('intv-ins-val');
-    if (elIns) elIns.className = insVal < 3.0 ? 'analisis-change neg' : 'analisis-change pos';
-    
-    const ectChange = ectVal < 3.0 ? '-' + ((3.0 - ectVal) * 10).toFixed(1) + '%' : '+' + ((ectVal - 3.0) * 10).toFixed(1) + '%';
-    safeSet('intv-ect-val', ectChange);
-    const elEct = document.getElementById('intv-ect-val');
-    if (elEct) elEct.className = ectVal < 3.0 ? 'analisis-change neg' : 'analisis-change pos';
-  }
-
-  // --- INTEGRASI BAGAN-BAGAN FACTOR PROFILE ---
-  const factorVals = {
-    ins: (fa.avg_ins_5 !== undefined && fa.avg_ins_5 !== null) ? parseFloat(fa.avg_ins_5) : 1.79,
-    ldi: (fa.avg_ldi_5 !== undefined && fa.avg_ldi_5 !== null) ? parseFloat(fa.avg_ldi_5) : 2.95,
-    weq: (fa.avg_weq_5 !== undefined && fa.avg_weq_5 !== null) ? parseFloat(fa.avg_weq_5) : 3.31,
-    ov:  (fa.avg_ov_5  !== undefined && fa.avg_ov_5  !== null) ? parseFloat(fa.avg_ov_5)  : 3.41,
-    ops: (fa.avg_ops_5 !== undefined && fa.avg_ops_5 !== null) ? parseFloat(fa.avg_ops_5) : 2.38,
-    ect: (fa.avg_ect_5 !== undefined && fa.avg_ect_5 !== null) ? parseFloat(fa.avg_ect_5) : 1.80
-  };
-
-  const factorNames = {
-    'SUMBER DAYA (INS)': factorVals.ins,
-    'KEPEMIMPINAN (LDI)': factorVals.ldi,
-    'PROSES (WEQ)': factorVals.weq,
-    'BUDAYA (OV)': factorVals.ov,
-    'INOVASI (OPS)': factorVals.ops,
-    'EKSTERNAL (ECT)': factorVals.ect
-  };
-
-  function getFactorBadge(score) {
-    if (score < 2.0) {
-      if (score < 1.8) return { label: 'CRITICAL', class: 'badge-critical' };
-      return { label: 'LOW', class: 'badge-low' };
+  const factorCards = [
+    ['ins', 'INS'], ['ldi', 'LDI'], ['weq', 'WEQ'],
+    ['ov', 'OV'], ['ops', 'OPS'], ['ect', 'ECT']
+  ];
+  document.querySelectorAll('.factor-card').forEach((card, index) => {
+    const [key, code] = factorCards[index] || [];
+    if (!key) return;
+    const score = factorScores[key];
+    const scoreElement = card.querySelector('.factor-score');
+    const badgeElement = card.querySelector('.factor-badge');
+    if (scoreElement) scoreElement.innerHTML = `${score === null ? '—' : score.toFixed(2)}<span> / 5.0</span>`;
+    if (badgeElement) {
+      badgeElement.textContent = score === null ? 'BELUM ADA DATA' : score < 2 ? 'PERLU PERHATIAN' : score < 3 ? 'CUKUP' : score < 4 ? 'BAIK' : 'SANGAT BAIK';
+      badgeElement.className = 'factor-badge ' + (score === null ? '' : score < 2 ? 'badge-low' : score < 3 ? 'badge-average' : score < 4 ? 'badge-good' : 'badge-optimal');
     }
-    if (score < 2.5) return { label: 'AVERAGE', class: 'badge-average' };
-    if (score < 3.0) return { label: 'GOOD', class: 'badge-good' };
-    if (score < 3.5) return { label: 'OPTIMAL', class: 'badge-optimal' };
-    return { label: 'PEAK', class: 'badge-peak' };
-  }
-
-  document.querySelectorAll('.factor-card').forEach(card => {
-    const nameEl = card.querySelector('.factor-name');
-    if (nameEl) {
-      const name = nameEl.textContent.trim();
-      if (factorNames[name] !== undefined) {
-        const val = factorNames[name];
-        const scoreEl = card.querySelector('.factor-score');
-        if (scoreEl) {
-          scoreEl.innerHTML = `${val.toFixed(2)}<span> / 5.0</span>`;
-        }
-        const badgeEl = card.querySelector('.factor-badge');
-        if (badgeEl) {
-          const badge = getFactorBadge(val);
-          badgeEl.className = 'factor-badge ' + badge.class;
-          badgeEl.textContent = badge.label;
-        }
-      }
-    }
+    const nameElement = card.querySelector('.factor-name');
+    if (nameElement && !nameElement.textContent.includes(`(${code})`)) nameElement.textContent += ` (${code})`;
   });
 
-  // --- INTEGRASI COMPARISON PAGE ---
-  const comparisonFactors = {
-    'Sumber Daya / INS (Institutional Resources)': { val: factorVals.ins, target: 3.30 },
-    'Kepemimpinan / LDI (Leadership)': { val: factorVals.ldi, target: 3.50 },
-    'Proses / WEQ (Work Environment Quality)': { val: factorVals.weq, target: 3.50 },
-    'Budaya / OV (Organizational Values)': { val: factorVals.ov, target: 3.60 },
-    'Inovasi / OPS (Operational Stability)': { val: factorVals.ops, target: 3.20 },
-    'Eksternal / ECT (Economic Connectivity)': { val: factorVals.ect, target: 3.00 }
-  };
-
-  document.querySelectorAll('.factor-row').forEach(row => {
-    const nameEl = row.querySelector('.factor-row-name');
-    if (nameEl) {
-      const name = nameEl.textContent.trim();
-      const targetCfg = comparisonFactors[name];
-      if (targetCfg) {
-        const { val, target } = targetCfg;
-        const scoreEl = row.querySelector('.factor-row-score');
-        if (scoreEl) {
-          scoreEl.textContent = val.toFixed(2);
-          if (val < 2.0) {
-            scoreEl.classList.add('red');
-          } else {
-            scoreEl.classList.remove('red');
-          }
-        }
-        const fillEl = row.querySelector('.bar-fill');
-        if (fillEl) {
-          const pct = Math.min(Math.round((val / target) * 100), 100);
-          fillEl.style.width = `${pct}%`;
-          fillEl.className = 'bar-fill';
-          if (val < 2.0) {
-            fillEl.classList.add('red');
-          } else if (val < 3.0) {
-            fillEl.classList.add('blue');
-          } else {
-            fillEl.classList.add('teal');
-          }
-        }
-      }
-    }
+  const factorRows = document.querySelectorAll('.factor-row');
+  const rowKeys = ['ins', 'ldi', 'weq', 'ov', 'ops', 'ect'];
+  factorRows.forEach((row, index) => {
+    const score = factorScores[rowKeys[index]];
+    const scoreElement = row.querySelector('.factor-row-score');
+    const realization = row.querySelector('.realization-label');
+    const bar = row.querySelector('.bar-fill');
+    if (scoreElement) scoreElement.textContent = score === null ? '—' : score.toFixed(2);
+    if (realization) realization.textContent = score === null ? 'Belum ada data' : `Skor hasil asesmen / 5.0`;
+    if (bar) bar.style.width = score === null ? '0%' : `${Math.max(0, Math.min(100, score / 5 * 100))}%`;
   });
 
-  // --- INTEGRASI PERBANDINGAN PERFORMER & GAP CARDS ---
-  if (AppState.umkmData && AppState.umkmData.length > 0) {
-    let bestUmkm = AppState.umkmData[0];
-    let worstUmkm = AppState.umkmData[0];
-    for (let i = 1; i < AppState.umkmData.length; i++) {
-      const u = AppState.umkmData[i];
-      if (u.skor > bestUmkm.skor) {
-        bestUmkm = u;
-      }
-      if (u.skor < worstUmkm.skor) {
-        worstUmkm = u;
-      }
-    }
+  const records = AppState.umkmData.filter(record => Number.isFinite(record.scoreOn5));
+  const orderedScores = [...records].sort((a, b) => b.scoreOn5 - a.scoreOn5);
+  const best = orderedScores[0];
+  const worst = orderedScores[orderedScores.length - 1];
+  safeSet('comp-top-id', best ? `${best.nama} · Asesmen ${best.id}` : 'Belum ada data');
+  safeSet('comp-top-score', best ? `${best.scoreOn5.toFixed(2)} / 5.00` : '— / 5.00');
+  safeSet('comp-top-status', best ? `Kategori: ${getHealthCategory(best) || '—'}` : 'Belum ada data');
+  safeSet('comp-crit-id', worst ? `${worst.nama} · Asesmen ${worst.id}` : 'Belum ada data');
+  safeSet('comp-crit-score', worst ? `${worst.scoreOn5.toFixed(2)} / 5.00` : '— / 5.00');
+  safeSet('comp-crit-status', worst ? `Kategori: ${getHealthCategory(worst) || '—'}` : 'Belum ada data');
 
-    const bestScoreOn5 = ((bestUmkm.skor / 100) * 5).toFixed(2);
-    const worstScoreOn5 = ((worstUmkm.skor / 100) * 5).toFixed(2);
+  const average = stats.avg_score_pct == null ? null : Number(stats.avg_score_pct) / 20;
+  safeSet('comp-gap-avg', average === null ? '—' : average.toFixed(2));
+  const gapBar = document.getElementById('comp-gap-bar');
+  if (gapBar) gapBar.style.width = average === null ? '0%' : `${Math.max(0, Math.min(100, average / 5 * 100))}%`;
+  safeSet('comp-gap-text', best && worst ? `Rentang skor asesmen: ${(best.scoreOn5 - worst.scoreOn5).toFixed(2)} poin.` : 'Perbandingan tersedia setelah hasil asesmen tersimpan.');
 
-    // Update Top Performer Card
-    safeSet('comp-top-id', 'UMKM ID ' + bestUmkm.id + ' (' + bestUmkm.nama + ')');
-    const topScoreEl = document.getElementById('comp-top-score');
-    if (topScoreEl) {
-      topScoreEl.innerHTML = `${bestScoreOn5}<span> / 5.00</span>`;
-    }
-    const topStatusEl = document.getElementById('comp-top-status');
-    if (topStatusEl) {
-      const isExcellent = parseFloat(bestScoreOn5) >= 3.5;
-      topStatusEl.textContent = isExcellent ? '✓ Status: Excellent' : '✓ Status: Good';
-      topStatusEl.className = 'performer-status status-excellent';
-    }
-
-    // Update Critical Action Card
-    safeSet('comp-crit-id', 'UMKM ID ' + worstUmkm.id + ' (' + worstUmkm.nama + ')');
-    const critScoreEl = document.getElementById('comp-crit-score');
-    if (critScoreEl) {
-      critScoreEl.innerHTML = `${worstScoreOn5}<span> / 5.00</span>`;
-    }
-    const critStatusEl = document.getElementById('comp-crit-status');
-    if (critStatusEl) {
-      const isIntervention = parseFloat(worstScoreOn5) < 2.0;
-      critStatusEl.textContent = isIntervention ? '! Status: Intervention Required' : '! Status: Needs Monitoring';
-      critStatusEl.className = isIntervention ? 'performer-status status-intervention' : 'performer-status status-excellent';
-    }
-
-    // Update Gap Analysis Card
-    const avgScorePct = (stats && stats.avg_score_pct) ? parseFloat(stats.avg_score_pct) : 76.0;
-    const avgScoreOn5 = ((avgScorePct / 100) * 5).toFixed(2);
-    safeSet('comp-gap-avg', avgScoreOn5);
-
-    const barPct = Math.round((parseFloat(avgScoreOn5) / 5) * 100);
-    const barEl = document.getElementById('comp-gap-bar');
-    if (barEl) {
-      barEl.style.width = barPct + '%';
-    }
-
-    const bestVal = parseFloat(bestScoreOn5);
-    const worstVal = parseFloat(worstScoreOn5);
-    const disparity = bestVal > 0 ? (((bestVal - worstVal) / bestVal) * 100).toFixed(1) : '0.0';
-    safeSet('comp-gap-text', `Penyimpangan skor antara ID ${bestUmkm.id} dan ID ${worstUmkm.id} menunjukkan disparitas standar klinis sebesar ${disparity}%.`);
+  const sectorCounts = {};
+  AppState.umkmData.forEach(record => {
+    if (record.sektor && record.sektor !== '—') sectorCounts[record.sektor] = (sectorCounts[record.sektor] || 0) + 1;
+  });
+  safeSet('sektor-total-unit', AppState.umkmData.length);
+  const sectorLegend = document.getElementById('sektor-legend');
+  if (sectorLegend) {
+    sectorLegend.textContent = '';
+    Object.entries(sectorCounts).sort((a, b) => b[1] - a[1]).forEach(([sector, count]) => {
+      const item = document.createElement('span');
+      item.textContent = `${sector}: ${Math.round(count / AppState.umkmData.length * 100)}%`;
+      sectorLegend.appendChild(item);
+    });
   }
 
-  // --- INTEGRASI EXECUTIVE SUMMARY ---
-  const sortedFactors = [
-    { key: 'Sumber Daya (INS)', val: factorVals.ins },
-    { key: 'Kepemimpinan (LDI)', val: factorVals.ldi },
-    { key: 'Proses (WEQ)', val: factorVals.weq },
-    { key: 'Budaya (OV)', val: factorVals.ov },
-    { key: 'Inovasi (OPS)', val: factorVals.ops },
-    { key: 'Eksternal (ECT)', val: factorVals.ect }
-  ].sort((a, b) => b.val - a.val);
+  const availableFactors = Object.entries(factorScores).filter(([, score]) => score !== null).sort((a, b) => b[1] - a[1]);
+  const priority = document.querySelector('.priority-text');
+  const strength = document.querySelector('.strength-text');
+  const summary = document.querySelector('.exec-text');
+  if (summary) summary.textContent = availableFactors.length ? 'Ringkasan berikut disusun dari rata-rata skor faktor pada asesmen tersimpan.' : 'Ringkasan faktor akan tersedia setelah hasil asesmen tersimpan.';
+  if (priority) priority.textContent = availableFactors.length ? `${availableFactors[availableFactors.length - 1][0].toUpperCase()} memiliki skor rata-rata terendah.` : 'Akan ditentukan dari skor faktor yang tersedia.';
+  if (strength) strength.textContent = availableFactors.length ? `${availableFactors[0][0].toUpperCase()} memiliki skor rata-rata tertinggi.` : 'Akan ditampilkan setelah hasil asesmen tersedia.';
 
-  const strong1 = sortedFactors[0].key;
-  const strong2 = sortedFactors[1].key;
-  const weak1 = sortedFactors[5].key;
-  const weak2 = sortedFactors[4].key;
+  const averageScore = average === null ? null : average.toFixed(2) + ' / 5';
+  safeSet('intv-protokol', total);
+  safeSet('intv-skor', total ? 'Data tersedia' : '—');
+  safeSet('intv-skor-sub', total ? 'Dari asesmen tersimpan' : 'Menunggu data');
+  safeSet('intv-efisiensi', averageScore || '—');
+  safeSet('intv-ins-val', factorScores.ins === null ? '—' : factorScores.ins.toFixed(2) + ' / 5');
+  safeSet('intv-ect-val', factorScores.ect === null ? '—' : factorScores.ect.toFixed(2) + ' / 5');
+  safeSet('rec-resp-time', averageScore || '—');
+  safeSet('rec-compliance', total);
+  safeSet('rec-critical', records.filter(record => record.scoreOn5 < 2).length);
+  safeSet('rec-next-scan', availableFactors.length ? availableFactors[availableFactors.length - 1][0].toUpperCase() : '—');
 
-  const execTextEl = document.querySelector('.exec-text');
-  if (execTextEl) {
-    execTextEl.innerHTML = `Berdasarkan analisis terbaru, <strong>${strong1}</strong> dan <strong>${strong2}</strong> menunjukkan performa yang sangat kuat, menandakan kekuatan internal yang sehat dan kohesif. Namun, terjadi kesenjangan signifikan pada <strong>${weak1}</strong> dan <strong>${weak2}</strong> yang memerlukan perhatian segera.`;
-  }
-
-  if (window.histChartInst && total > 0) {
-    const newData = updateDistributionUI();
-    const sorted = [...newData].sort((a, b) => b - a);
-    const top1 = sorted[0], top2 = sorted[1];
-    window.histChartInst.data.datasets[0].data = newData;
-    window.histChartInst.data.datasets[0].backgroundColor = newData.map(v => v===top1?'#1a56db': v===top2?'#3b82f6':'#93c5fd');
+  if (window.histChartInst) {
+    const distribution = updateDistributionUI();
+    window.histChartInst.data.datasets[0].data = distribution;
     window.histChartInst.update('none');
   } else {
     updateDistributionUI();
   }
+
+  [['trendMini', 5], ['trendChart', 4]].forEach(([id, count]) => {
+    const chart = Chart.getChart(document.getElementById(id));
+    if (!chart) return;
+    const trend = getSubmissionTrend(count);
+    chart.data.labels = trend.labels;
+    chart.data.datasets[0].data = trend.values;
+    chart.update('none');
+  });
 }
 
-// Update semua elemen yang menampilkan total UMKM
 function updateTotalDisplay(total) {
   safeSet('donut-total', total);
   safeSet('stat-total-umkm', total);
   safeSet('rec-total-count', total);
+  safeSet('stat-total-rec', total);
+  safeSet('intv-protokol', total);
 }
 
-// Update teks legend di bawah donut chart
-function updateDonutLegend(total) {
-  const buruk = Math.round(total * 0.065);
-  const baik  = Math.round(total * 0.194);
-  const cukup = total - buruk - baik;
-  const legends = document.querySelectorAll('.legend-item');
-  if (legends.length >= 4) {
-    // Buruk, Cukup, Baik, Sangat Baik
-    const texts = [`Buruk (${buruk})`, `Cukup (${cukup})`, `Baik (${baik})`, 'Sangat Baik (0)'];
-    legends.forEach((el, i) => {
-      const dot = el.querySelector('.legend-dot');
-      const text = texts[i] || el.textContent;
-      if (dot) el.innerHTML = '';
-      if (dot) el.appendChild(dot);
-      el.appendChild(document.createTextNode(text));
-    });
-  }
-}
-
-// Function to update the distribution data dynamically based on AppState
-function updateDistributionUI() {
-  const data = AppState.filteredData || AppState.umkmData || [];
-  const total = data.length;
-  if (total === 0) return [0,0,0,0,0,0,0];
-
-  const distPop = document.getElementById('dist-populasi');
-  if (distPop) distPop.textContent = 'Populasi: ' + total;
-
-  let bins = [0, 0, 0, 0, 0, 0, 0];
-  let scores5 = [];
-  data.forEach(u => {
-     let s5 = u.skor / 20; 
-     if (s5 === 0) s5 = 1.0; 
-     scores5.push(s5);
-     if (s5 < 1.25) bins[0]++;
-     else if (s5 < 1.75) bins[1]++;
-     else if (s5 < 2.25) bins[2]++;
-     else if (s5 < 2.75) bins[3]++;
-     else if (s5 < 3.25) bins[4]++;
-     else if (s5 < 3.75) bins[5]++;
-     else bins[6]++;
+function updateDonutLegend(counts = getHealthCategoryCounts()) {
+  const labels = [
+    `Perlu Perhatian (${counts['PERLU PERHATIAN']})`,
+    `Cukup (${counts.CUKUP})`,
+    `Baik (${counts.BAIK})`,
+    `Sangat Baik (${counts['SANGAT BAIK']})`
+  ];
+  document.querySelectorAll('.legend-item').forEach((item, index) => {
+    const dot = item.querySelector('.legend-dot');
+    item.textContent = labels[index] || '';
+    if (dot) item.prepend(dot);
   });
+}
+function updateDistributionUI() {
+  const records = AppState.umkmData.filter(record => Number.isFinite(record.scoreOn5));
+  const bins = Array(11).fill(0);
+  const scores = records.map(record => record.scoreOn5).sort((a, b) => a - b);
+  safeSet('dist-populasi', `Asesmen: ${scores.length}`);
 
-  scores5.sort((a,b) => a-b);
-  const q1 = scores5[Math.floor(total * 0.25)] || 0;
-  const q2 = scores5[Math.floor(total * 0.5)] || 0;
-  const q3 = scores5[Math.floor(total * 0.75)] || 0;
+  if (!scores.length) {
+    ['bw-median-score', 'bw-q1', 'bw-q2', 'bw-q3', 'bw-iqr'].forEach(id => safeSet(id, '—'));
+    safeSet('dist-mu', 'μ: —');
+    safeSet('outlier-count-title', 'Data Outlier (0)');
+    const tbody = document.getElementById('outlier-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#71818d;padding:10px;">Belum ada data asesmen.</td></tr>';
+    return bins;
+  }
+
+  scores.forEach(score => bins[Math.min(10, Math.floor(score * 2))]++);
+  const percentile = p => {
+    if (scores.length === 1) return scores[0];
+    const index = p * (scores.length - 1);
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    return scores[lower] + (scores[upper] - scores[lower]) * (index - lower);
+  };
+  const q1 = percentile(0.25);
+  const median = percentile(0.5);
+  const q3 = percentile(0.75);
   const iqr = q3 - q1;
-
-  safeSet('bw-median-score', q2.toFixed(2));
+  safeSet('bw-median-score', median.toFixed(2));
   safeSet('bw-q1', q1.toFixed(2));
-  safeSet('bw-q2', q2.toFixed(2));
+  safeSet('bw-q2', median.toFixed(2));
   safeSet('bw-q3', q3.toFixed(2));
   safeSet('bw-iqr', iqr.toFixed(2));
+  safeSet('dist-mu', 'μ: ' + median.toFixed(2));
 
-  let sum = 0;
-  scores5.forEach(s => sum += s);
-  const mean = sum / total;
-  let sumSq = 0;
-  scores5.forEach(s => sumSq += (s - mean)*(s - mean));
-  const sd = Math.sqrt(sumSq / total);
+  const lowerBound = q1 - 1.5 * iqr;
+  const upperBound = q3 + 1.5 * iqr;
+  const outliers = records
+    .filter(record => record.scoreOn5 < lowerBound || record.scoreOn5 > upperBound)
+    .map(record => ({ id: record.id, z: record.scoreOn5 - median, raw: record.scoreOn5 }))
+    .sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
+  AppState.outliers = outliers;
 
-  let outliers = [];
-  data.forEach(u => {
-     let s5 = u.skor / 20;
-     if (s5 === 0) s5 = 1.0;
-     let z = sd === 0 ? 0 : Math.abs(s5 - mean) / sd;
-     if (z > 2.5) outliers.push({ id: u.id, z: z });
-  });
+  const box = document.getElementById('bw-box');
+  const medianLine = document.getElementById('bw-median-line');
+  const wrap = document.getElementById('bw-wrap');
+  if (wrap && box && medianLine) {
+    const toPercent = value => Math.max(0, Math.min(100, value / 5 * 100));
+    box.style.left = toPercent(q1) + '%';
+    box.style.width = (toPercent(q3) - toPercent(q1)) + '%';
+    medianLine.style.left = toPercent(median) + '%';
+    wrap.querySelectorAll('.bw-dynamic-dot').forEach(dot => dot.remove());
+    outliers.forEach(outlier => {
+      const dot = document.createElement('div');
+      dot.className = 'boxplot-dot bw-dynamic-dot';
+      dot.style.left = toPercent(outlier.raw) + '%';
+      dot.style.background = outlier.z < 0 ? 'var(--warning)' : 'var(--danger)';
+      wrap.appendChild(dot);
+    });
+  }
 
-  outliers.sort((a,b) => b.z - a.z);
-
-  const titleEl = document.getElementById('outlier-count-title');
-  if (titleEl) titleEl.textContent = 'Data Outlier (' + outliers.length + ')';
-
+  safeSet('outlier-count-title', `Data Outlier (${outliers.length})`);
   const tbody = document.getElementById('outlier-tbody');
   if (tbody) {
-     tbody.innerHTML = '';
-     if (outliers.length === 0) {
-         tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#9ca3af;padding:10px;">Tidak ada outlier (Z > 2.5)</td></tr>';
-     } else {
-         outliers.forEach(o => {
-             const tr = document.createElement('tr');
-             tr.innerHTML = `<td>#SH-${o.id}</td><td class="z-score" style="color:var(--danger);font-weight:700">${o.z.toFixed(2)}</td>`;
-             tbody.appendChild(tr);
-         });
-     }
+    tbody.innerHTML = '';
+    if (!outliers.length) {
+      tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#71818d;padding:10px;">Tidak ada outlier berdasarkan rentang IQR.</td></tr>';
+    } else {
+      outliers.forEach(outlier => {
+        const row = document.createElement('tr');
+        const color = outlier.z < 0 ? 'var(--warning)' : 'var(--danger)';
+        row.innerHTML = `<td>#${outlier.id}</td><td class="z-score" style="color:${color};font-weight:700">${outlier.raw.toFixed(2)}</td>`;
+        tbody.appendChild(row);
+      });
+    }
   }
   return bins;
 }
 
-// Called after form submit succeeds — update charts in-place
-function refreshAllCharts() {
-  const total = AppState.totalUmkm;
-
-  // Update semua angka total
-  updateTotalDisplay(total);
-  updateDonutLegend(total);
-
-  // Donut chart — update data proporsional, JANGAN reset ke 0
-  if (window.donutChartInst) {
-    const buruk = Math.round(total * 0.065);
-    const baik  = Math.round(total * 0.194);
-    const cukup = total - buruk - baik;
-    window.donutChartInst.data.datasets[0].data = [buruk, cukup, baik, 0];
-    window.donutChartInst.options.animation = { duration: 600, easing: 'easeOutQuart' };
-    window.donutChartInst.update();
-  }
-
-  // Histogram distribution — scale proporsional
-  if (window.histChartInst) {
-    const newData = updateDistributionUI();
-    const sorted = [...newData].sort((a, b) => b - a);
-    const top1 = sorted[0], top2 = sorted[1];
-    window.histChartInst.data.datasets[0].data = newData;
-    window.histChartInst.data.datasets[0].backgroundColor = newData.map(v => v===top1?'#1a56db': v===top2?'#3b82f6':'#93c5fd');
-    window.histChartInst.options.animation = { duration: 600 };
-    window.histChartInst.update();
-  }
-
-  // Bar & spider chart: update via DB (jika ada), fallback ke nilai saat ini
-  loadDashboardData();
+async function refreshAllCharts() {
+  AppState.umkmData = [];
+  AppState.filteredData = [];
+  AppState.dataLoadFailed = false;
+  await loadUmkmData();
+  await loadDashboardData();
+  renderUmkmTable();
 }
 
 function safeSet(id, val) {
   const el = document.getElementById(id);
   if (el) el.textContent = val;
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  PROFILE PAGE
-// ═══════════════════════════════════════════════════════════════
 function renderProfilePage() {
   const user = AppState.currentUser;
   if (!user) return;
@@ -1055,7 +812,7 @@ function renderProfilePage() {
 }
 
 function infoRow(icon, label, value, valColor='var(--gray-800)', valBg='') {
-  const valStyle = valColor !== 'var(--gray-800)' 
+  const valStyle = valColor !== 'var(--gray-800)'
     ? `background:${valBg};color:${valColor};padding:2px 10px;border-radius:20px;font-weight:700;font-size:12px`
     : 'color:var(--gray-800);font-weight:600;font-size:13px';
   return `
@@ -1124,83 +881,90 @@ function destroyChart(id) {
 // ═══════════════════════════════════════════════════════════════
 //  HOME CHARTS
 // ═══════════════════════════════════════════════════════════════
+function getSubmissionTrend(count) {
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+  const now = new Date();
+  const labels = [];
+  const keys = [];
+  const values = Array(count).fill(0);
+  for (let offset = count - 1; offset >= 0; offset--) {
+    const month = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    labels.push(monthNames[month.getMonth()]);
+    keys.push(`${month.getFullYear()}-${month.getMonth()}`);
+  }
+  AppState.umkmData.forEach(record => {
+    if (!record.tanggal) return;
+    const date = new Date(String(record.tanggal).replace(' ', 'T'));
+    if (Number.isNaN(date.getTime())) return;
+    const index = keys.indexOf(`${date.getFullYear()}-${date.getMonth()}`);
+    if (index >= 0) values[index]++;
+  });
+  return { labels, values };
+}
+
 function initHomeCharts() {
   AppState.chartsInit.home = true;
-
-  const total = AppState.totalUmkm;  // dari localStorage, persist across reload
-  const buruk = Math.round(total * 0.065);
-  const baik  = Math.round(total * 0.194);
-  const cukup = total - buruk - baik;
-
+  const counts = getHealthCategoryCounts();
   destroyChart('donutChart');
   window.donutChartInst = new Chart(document.getElementById('donutChart'), {
     type: 'doughnut',
     data: {
-      labels: ['Buruk','Cukup','Baik','Sangat Baik'],
-      datasets: [{ data:[buruk, cukup, baik, 0], backgroundColor:['#ef4444','#1a56db','#22c55e','#d1d5db'], borderWidth:3, borderColor:'#fff', hoverOffset:10 }]
+      labels: ['Perlu Perhatian', 'Cukup', 'Baik', 'Sangat Baik'],
+      datasets: [{ data: [counts['PERLU PERHATIAN'], counts.CUKUP, counts.BAIK, counts['SANGAT BAIK']], backgroundColor: ['#b88a42', '#9aa8ad', '#54758a', '#263d50'], borderWidth: 3, borderColor: '#fff', hoverOffset: 8 }]
     },
-    options: { cutout:'72%', plugins:{ legend:{display:false} }, animation:{ animateScale:true, animateRotate:true, duration:1000, easing:'easeOutBounce' } }
+    options: { cutout: '72%', plugins: { legend: { display: false } } }
   });
-
-  // Update semua angka yang menampilkan total
-  updateTotalDisplay(total);
-
-  // Update legend di bawah donut
-  updateDonutLegend(total);
 
   destroyChart('barChart');
   window.barChartInst = new Chart(document.getElementById('barChart'), {
     type: 'bar',
     data: {
-      labels: ['Budaya','Inovasi','Proses','Sumber\nDaya','Kepemimpinan','Eksternal'],
-      datasets: [{ data:[3.41,2.38,3.31,1.79,2.95,1.80], backgroundColor:['#0f9b6e','#d97706','#1a56db','#ef4444','#1a56db','#0891b2'], borderRadius:8, borderSkipped:false }]
+      labels: ['Budaya', 'Operasional', 'Lingkungan Kerja', 'Kelembagaan', 'Kepemimpinan', 'Eksternal'],
+      datasets: [{ data: [getFactorAverage('ov'), getFactorAverage('ops'), getFactorAverage('weq'), getFactorAverage('ins'), getFactorAverage('ldi'), getFactorAverage('ect')], backgroundColor: '#54758a', borderRadius: 8, borderSkipped: false }]
     },
-    options: {
-      plugins:{ legend:{display:false} },
-      scales:{ y:{ beginAtZero:true, max:5, grid:{color:'#f3f4f6'}, ticks:{stepSize:1} }, x:{ grid:{display:false} } },
-      animation:{ duration:1200, easing:'easeOutElastic', delay:(ctx)=>ctx.dataIndex*80 }
-    }
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 5, grid: { color: '#e5e6e3' }, ticks: { stepSize: 1 } }, x: { grid: { display: false } } } }
   });
 
+  const trend = getSubmissionTrend(5);
   destroyChart('trendMini');
   new Chart(document.getElementById('trendMini'), {
-    type:'line',
-    data:{ labels:['Q1','Q2','Q3','Q4','Q5'], datasets:[{ data:[1.2,1.8,2.0,2.5,3.1], borderColor:'rgba(255,255,255,0.9)', borderWidth:2, pointRadius:3, pointBackgroundColor:'#fff', fill:true, backgroundColor:'rgba(255,255,255,0.1)', tension:0.4 }] },
-    options:{ plugins:{legend:{display:false}}, scales:{y:{display:false},x:{display:false}}, animation:{duration:1000} }
+    type: 'line',
+    data: { labels: trend.labels, datasets: [{ data: trend.values, borderColor: 'rgba(255,255,255,0.9)', borderWidth: 2, pointRadius: 2, pointBackgroundColor: '#fff', fill: true, backgroundColor: 'rgba(255,255,255,0.1)', tension: 0.35 }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { display: false } } }
   });
 }
 
-function switchChart(mode) {
-  document.getElementById('btnBulanan')?.classList.toggle('active', mode==='bulanan');
-  document.getElementById('btnQuater')?.classList.toggle('active', mode==='quater');
-  if (!window.barChartInst) return;
-  window.barChartInst.data.datasets[0].data = mode==='bulanan'
-    ? [2.80,2.10,3.10,1.50,2.60,1.60] : [3.41,2.38,3.31,1.79,2.95,1.80];
-  window.barChartInst.options.animation = {duration:700,easing:'easeOutQuart'};
-  window.barChartInst.update();
-  showToast(`Tampilan: ${mode==='bulanan'?'Bulanan':'Per Kuarter'}`);
+function switchChart() {
+  showToast('Grafik menampilkan ringkasan seluruh asesmen yang tersimpan.');
 }
 
 function initSpiderChart() {
   AppState.chartsInit.factor = true;
-  destroyChart('spiderChart');
-  
-  const fa = AppState.factorAverages;
-  const ins = fa ? (parseFloat(fa.avg_ins_5) || 1.79) : 1.79;
-  const ldi = fa ? (parseFloat(fa.avg_ldi_5) || 2.95) : 2.95;
-  const weq = fa ? (parseFloat(fa.avg_weq_5) || 3.31) : 3.31;
-  const ov  = fa ? (parseFloat(fa.avg_ov_5)  || 3.41) : 3.41;
-  const ops = fa ? (parseFloat(fa.avg_ops_5) || 2.38) : 2.38;
-  const ect = fa ? (parseFloat(fa.avg_ect_5) || 1.80) : 1.80;
+  const canvas = document.getElementById('spiderChart');
+  if (!canvas) return;
 
-  window.spiderChartInst = new Chart(document.getElementById('spiderChart'), {
-    type:'radar',
-    data:{labels:['Sumber Daya','Kepemimpinan','Proses','Budaya','Inovasi','Eksternal'],
-          datasets:[
-            {label:'Skor Aktual',data:[ins,ldi,weq,ov,ops,ect],backgroundColor:'rgba(26,86,219,0.18)',borderColor:'#1a56db',pointBackgroundColor:'#1a56db',borderWidth:2.5,pointRadius:5},
-            {label:'Benchmark',data:[2.5,2.5,2.5,2.5,2.5,2.5],backgroundColor:'transparent',borderColor:'#d1d5db',borderDash:[5,5],borderWidth:1.5,pointRadius:3}
-          ]},
-    options:{scales:{r:{beginAtZero:true,max:5,ticks:{stepSize:1,backdropColor:'transparent'},pointLabels:{font:{size:11,weight:'700'}},grid:{color:'#e5e7eb'}}},plugins:{legend:{display:false}},animation:{duration:1200}}
+  destroyChart('spiderChart');
+  window.spiderChartInst = new Chart(canvas, {
+    type: 'radar',
+    data: {
+      labels: ['INS', 'LDI', 'WEQ', 'OV', 'OPS', 'ECT'],
+      datasets: [{
+        data: [
+          getFactorAverage('ins'), getFactorAverage('ldi'), getFactorAverage('weq'),
+          getFactorAverage('ov'), getFactorAverage('ops'), getFactorAverage('ect')
+        ],
+        backgroundColor: 'rgba(84, 117, 138, 0.18)',
+        borderColor: '#54758a',
+        pointBackgroundColor: '#b88a42',
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: '#54758a'
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { r: { beginAtZero: true, min: 0, max: 5, ticks: { stepSize: 1 } } }
+    }
   });
 }
 
@@ -1237,7 +1001,7 @@ function initDistCharts() {
   window.histChartInst = new Chart(document.getElementById('histChart'), {
     type: 'bar',
     data: {
-      labels: ['1.0','1.5','2.0','2.5','3.0','3.5','4.0'],
+      labels: ['0.0','0.5','1.0','1.5','2.0','2.5','3.0','3.5','4.0','4.5','5.0'],
       datasets: [{
         data: raw,
         backgroundColor: raw.map(v => v===top1?'#1a56db': v===top2?'#3b82f6':'#93c5fd'),
@@ -1247,7 +1011,7 @@ function initDistCharts() {
     plugins: [peakPlugin],
     options: {
       plugins: { legend:{display:false} },
-      scales: { y:{ beginAtZero:true, grid:{color:'#f3f4f6'} }, x:{ grid:{display:false}, title:{display:true,text:'Skor (1.0 – 4.0)'} } },
+      scales: { y:{ beginAtZero:true, grid:{color:'#f3f4f6'} }, x:{ grid:{display:false}, title:{display:true,text:'Skor (0.0 – 5.0)'} } },
       animation: { duration:1000, easing:'easeOutBounce', delay:(ctx)=>ctx.dataIndex*60 }
     }
   });
@@ -1256,13 +1020,52 @@ function initDistCharts() {
 function initCompCharts() {
   AppState.chartsInit.comparison = true;
   destroyChart('trendChart');
-  new Chart(document.getElementById('trendChart'),{type:'bar',data:{labels:['Mei','Agt','Nov','Des'],datasets:[{data:[1.5,1.8,3.2,2.8],backgroundColor:['#d1d5db','#d1d5db','#1a56db','#93c5fd'],borderRadius:6,borderSkipped:false}]},options:{plugins:{legend:{display:false}},scales:{y:{display:false},x:{grid:{display:false}}},animation:{duration:900,easing:'easeOutElastic',delay:(c)=>c.dataIndex*100}}});
+  const trend = getSubmissionTrend(4);
+  new Chart(document.getElementById('trendChart'), {
+    type: 'bar',
+    data: { labels: trend.labels, datasets: [{ data: trend.values, backgroundColor: '#54758a', borderRadius: 6, borderSkipped: false }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } } }
+  });
 }
-
 function filterPipa(btn, type) {
   document.querySelectorAll('.pipa-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  document.querySelectorAll('.pipa-card').forEach(c=>{c.style.display=(type==='all'||c.dataset.priority==='high')?'block':'none';});
+  document.querySelectorAll('.pipa-card').forEach(card => {
+    card.style.display = type === 'all' || card.dataset.priority === type ? 'block' : 'none';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EXPORT OUTLIERS
+// ═══════════════════════════════════════════════════════════════
+function exportOutlierData() {
+  if (!AppState.outliers || AppState.outliers.length === 0) {
+    showToast('Tidak ada data outlier untuk diekspor.', 'warning');
+    return;
+  }
+
+  showToast('Menyiapkan file CSV data anomali...', 'success');
+
+  // CSV Header
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += "ID UMKM,Z-Score Deviation,Tipe Anomali\n";
+
+  // Add rows
+  AppState.outliers.forEach(o => {
+    const tipe = o.z < 0 ? "Anomali Bawah (Negatif)" : "Anomali Atas (Positif)";
+    const id = "SH-" + o.id;
+    csvContent += `${id},${o.z.toFixed(3)},${tipe}\n`;
+  });
+
+  // Trigger download
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  const dateStr = new Date().toISOString().split('T')[0];
+  link.setAttribute("download", `outlier_anomalies_${dateStr}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 // ═══════════════════════════════════════════════════════════════
